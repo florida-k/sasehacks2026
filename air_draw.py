@@ -9,7 +9,6 @@ cap = cv2.VideoCapture(0)
 
 canvas = None
 prev_x, prev_y = None, None
-image_count = 1
 
 with mp_hands.Hands(
     static_image_mode=False,
@@ -21,8 +20,8 @@ with mp_hands.Hands(
     while True:
         success, frame = cap.read()
         if not success:
-            print("Could not access webcam.")
             break
+
         frame = cv2.flip(frame, 1)
         h, w, _ = frame.shape
 
@@ -31,6 +30,8 @@ with mp_hands.Hands(
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = hands.process(rgb)
+
+        drawing = False
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
@@ -43,48 +44,42 @@ with mp_hands.Hands(
                 x = int(tip.x * w)
                 y = int(tip.y * h)
 
-                cv2.circle(frame, (x, y), 10, (0, 255, 0), -1)
-
-                # draw if finger is up
+                # check if finger is raised
                 if tip.y < joint.y:
+                    drawing = True
+                    cv2.circle(frame, (x, y), 10, (0,255,0), -1)
+
                     if prev_x is None:
                         prev_x, prev_y = x, y
 
-                    cv2.line(canvas, (prev_x, prev_y), (x, y), (0, 0, 0), 5)
+                    cv2.line(canvas, (prev_x, prev_y), (x, y), (255,0,0), 5)
+
                     prev_x, prev_y = x, y
+
                 else:
                     prev_x, prev_y = None, None
 
         else:
             prev_x, prev_y = None, None
 
-        output = cv2.add(frame, canvas)
+        frame = cv2.add(frame, canvas)
 
-        cv2.putText(
-            output,
-            "Finger up = draw | S = save | C = clear | Q = quit",
-            (10, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2
-        )
+        cv2.putText(frame,
+                    "Index finger up = draw | Close hand = stop | C = clear | Q = quit",
+                    (10,40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255,255,255),
+                    2)
 
-        cv2.imshow("Air Drawing", output)
+        cv2.imshow("Air Drawing", frame)
 
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(1)
 
         if key == ord("q"):
             break
-
-        elif key == ord("c"):
+        if key == ord("c"):
             canvas = np.zeros_like(frame)
-
-        elif key == ord("s"):
-            filename = f"drawing_{image_count}.png"
-            cv2.imwrite(filename, canvas)
-            print("Saved:", filename)
-            image_count += 1
 
 cap.release()
 cv2.destroyAllWindows()
