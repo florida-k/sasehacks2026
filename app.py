@@ -1,9 +1,6 @@
-
-
 from __future__ import annotations
 
 import base64
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +12,6 @@ GALLERY_DIR = STATIC_DIR / "gallery"
 GALLERY_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 
 
 @app.get("/")
@@ -28,21 +24,15 @@ def save_image():
     data = request.get_json(silent=True) or {}
     image_data = data.get("image")
 
-    if not image_data or not isinstance(image_data, str):
-        return jsonify({"success": False, "error": "No image data provided."}), 400
+    if not image_data:
+        return jsonify({"success": False})
 
     prefix = "data:image/png;base64,"
-    if not image_data.startswith(prefix):
-        return jsonify({"success": False, "error": "Expected a PNG data URL."}), 400
+    image_data = image_data.replace(prefix, "")
 
-    try:
-        encoded = image_data[len(prefix):]
-        image_bytes = base64.b64decode(encoded)
-    except Exception:
-        return jsonify({"success": False, "error": "Could not decode image data."}), 400
+    image_bytes = base64.b64decode(image_data)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"drawing_{timestamp}.png"
+    filename = f"drawing_{datetime.now().timestamp()}.png"
     filepath = GALLERY_DIR / filename
 
     with open(filepath, "wb") as f:
@@ -50,19 +40,16 @@ def save_image():
 
     return jsonify({
         "success": True,
-        "filename": filename,
-        "url": f"/gallery/{filename}",
+        "url": f"/gallery/{filename}"
     })
 
 
 @app.get("/gallery-images")
 def gallery_images():
-    files = sorted(
-        [f.name for f in GALLERY_DIR.glob("*.png")],
-        reverse=True,
-    )
+    files = sorted(GALLERY_DIR.glob("*.png"), reverse=True)
+
     return jsonify({
-        "images": [f"/gallery/{name}" for name in files]
+        "images": [f"/gallery/{f.name}" for f in files]
     })
 
 

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Finger Draw</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<h1>Finger Draw</h1>
+
+<!-- HOME PAGE -->
+<div id="homePage">
+
+  <button id="showDrawBtn">Draw</button>
+
+  <button id="showGalleryBtn">Gallery</button>
+
+</div>
+
+
+<!-- DRAW SECTION -->
+<section id="drawSection" class="hidden">
+
+  <div class="video-container">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="drawCanvas"></canvas>
+  </div>
+
+  <div class="draw-buttons">
+    <button id="clearBtn">Clear</button>
+    <button id="saveBtn">Save PNG</button>
+    <button id="backHomeBtn">Home</button>
+  </div>
+
+  <p id="statusText"></p>
+
+</section>
+
+
+<!-- GALLERY SECTION -->
+<section id="gallerySection" class="hidden">
+
+  <h2>Gallery</h2>
+
+  <button id="backHomeBtn2">Home</button>
+
+  <div id="gallery"></div>
+
+</section>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
