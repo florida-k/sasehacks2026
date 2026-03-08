@@ -73,7 +73,7 @@ async function saveDrawing() {
   off.height = canvas.height;
 
   const offctx = off.getContext("2d");
-  offctx.fillStyle = "black";
+  offctx.fillStyle = "#f1f1e1";
   offctx.fillRect(0, 0, off.width, off.height);
   offctx.drawImage(canvas, 0, 0);
 
@@ -91,6 +91,8 @@ async function saveDrawing() {
 
   if (data.success) {
     statusText.textContent = "Saved image";
+    saveBtn.style.color = "green";
+    setTimeout(() => saveBtn.style.color = "white", 700);
   } else {
     statusText.textContent = "Save failed";
   }
@@ -159,7 +161,7 @@ hands.onResults((results) => {
       ctx.beginPath();
       ctx.moveTo(prevX, prevY);
       ctx.lineTo(x, y);
-      ctx.strokeStyle = "white";
+      ctx.strokeStyle = "black";
       ctx.lineWidth = 5;
       ctx.lineCap = "round";
       ctx.stroke();
