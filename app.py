@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import abort
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -56,6 +57,27 @@ def gallery_images():
 @app.get("/gallery/<path:filename>")
 def gallery_file(filename: str):
     return send_from_directory(GALLERY_DIR, filename)
+
+
+@app.route('/delete', methods=['DELETE'])
+def delete_image():
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename') if isinstance(data, dict) else None
+    if not filename:
+        return jsonify({"success": False, "error": "missing filename"}), 400
+
+    # sanitize filename to avoid path traversal
+    filename = Path(filename).name
+    filepath = GALLERY_DIR / filename
+
+    if not filepath.exists():
+        return jsonify({"success": False, "error": "file not found"}), 404
+
+    try:
+        filepath.unlink()
+        return jsonify({"success": True})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 if __name__ == "__main__":

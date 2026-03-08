@@ -4,6 +4,26 @@
   <meta charset="UTF-8">
   <title>My Masterpiece</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* horizontal gallery */
+    #gallery { display:flex; flex-direction:row; flex-wrap:nowrap; gap:12px; overflow-x:auto; overflow-y:hidden; align-items:center; padding:12px; scroll-behavior:smooth; -ms-overflow-style: none; scrollbar-width: none; }
+    /* hide webkit scrollbars */
+    #gallery::-webkit-scrollbar { height: 0; width: 0; }
+    .gallery-item { position:relative; display:inline-block; flex:0 0 auto; }
+    .gallery-item img { max-height:320px; width:auto; display:block; cursor:pointer; border-radius:6px; background:#fff; }
+    .gallery-item.selected { outline:4px solid #2ecc71; transform:scale(0.98); }
+    /* top-right toolbar */
+    #galleryToolbar { position:fixed; top:12px; right:12px; display:flex; gap:8px; z-index:999; }
+    #galleryToolbar button { padding:8px 10px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+    #galleryToolbar button.primary { background:#e74c3c; color:#fff; border-color:#c0392b; }
+    #galleryToolbar button.toggle-on { background:#2ecc71; color:#fff; border-color:#27ae60; }
+    /* scroll arrows (left and right) */
+    #scrollPrevContainer, #scrollNextContainer { position:fixed; top:50%; transform:translateY(-50%); display:flex; gap:6px; z-index:1000; }
+    #scrollPrevContainer { left:12px; }
+    #scrollNextContainer { right:12px; }
+    #scrollPrevContainer button, #scrollNextContainer button { width:36px; height:36px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; font-size:16px; padding:0; }
+    #scrollPrevContainer button:active, #scrollNextContainer button:active { transform:scale(0.98); }
+  </style>
 </head>
 <body>
 
@@ -47,12 +67,143 @@
 
   <div id="gallery"></div>
 
+  <div id="galleryToolbar" aria-hidden="false">
+    <button id="selectToggle">Select</button>
+    <button id="deleteSelected" class="primary" disabled>Delete Selected (0)</button>
+  </div>
+
+  <div id="scrollPrevContainer" aria-hidden="false">
+    <button id="scrollPrev">◀</button>
+  </div>
+  <div id="scrollNextContainer" aria-hidden="false">
+    <button id="scrollNext">▶</button>
+  </div>
+
 </section>
 
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<script>
+  (function(){
+    const gallery = document.getElementById('gallery');
+    const selectToggle = document.getElementById('selectToggle');
+    const deleteSelectedBtn = document.getElementById('deleteSelected');
+    let selectMode = false;
+    const selected = new Map(); // filename -> element
+    if(!gallery || !selectToggle || !deleteSelectedBtn) return;
+
+    function wrapImage(img){
+      if(img.dataset.enhanced) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'gallery-item';
+      img.parentNode.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+      img.dataset.enhanced = '1';
+      // store filename on the img for quick access
+      const raw = img.dataset.filename || img.getAttribute('data-src') || img.src || '';
+      try{ img.dataset.filename = decodeURIComponent(raw.split('/').pop().split('?')[0]); }catch(e){ img.dataset.filename = raw; }
+    }
+
+    function enhanceExisting(){
+      Array.from(gallery.querySelectorAll('img')).forEach(wrapImage);
+    }
+
+    const mo = new MutationObserver(muts=>{
+      for(const m of muts){
+        for(const n of m.addedNodes){
+          if(n.nodeName === 'IMG') wrapImage(n);
+          else if(n.querySelectorAll) n.querySelectorAll('img').forEach(wrapImage);
+        }
+      }
+    });
+    mo.observe(gallery, { childList: true, subtree: true });
+
+    function updateToolbar(){
+      const count = selected.size;
+      deleteSelectedBtn.disabled = count === 0;
+      deleteSelectedBtn.textContent = `Delete Selected (${count})`;
+      if(selectMode) selectToggle.classList.add('toggle-on'); else selectToggle.classList.remove('toggle-on');
+    }
+
+    gallery.addEventListener('click', e=>{
+      const img = e.target.closest && e.target.closest('img');
+      if(!img) return;
+      if(!selectMode) return; // only toggle selection while in select mode
+      const item = img.closest('.gallery-item');
+      const filename = img.dataset.filename || img.src.split('/').pop();
+      if(item.classList.contains('selected')){
+        item.classList.remove('selected');
+        selected.delete(filename);
+      } else {
+        item.classList.add('selected');
+        selected.set(filename, item);
+      }
+      updateToolbar();
+    });
+
+    selectToggle.addEventListener('click', ()=>{
+      selectMode = !selectMode;
+      selectToggle.textContent = selectMode ? 'Selecting...' : 'Select';
+      if(!selectMode){
+        // clear selections when leaving select mode
+        for(const el of selected.values()) el.classList.remove('selected');
+        selected.clear();
+      }
+      updateToolbar();
+    });
+
+    deleteSelectedBtn.addEventListener('click', async ()=>{
+      if(selected.size === 0) return;
+      if(!confirm(`Delete ${selected.size} selected image(s) from disk?`)) return;
+      const failures = [];
+      // iterate over a copy because we will remove elements
+      const entries = Array.from(selected.entries());
+      for(const [filename, el] of entries){
+        try{
+          const res = await fetch('/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+          });
+          if(res.ok){
+            el.remove();
+            selected.delete(filename);
+          } else {
+            const txt = await res.text().catch(()=>res.statusText||'Failed');
+            failures.push(`${filename}: ${txt}`);
+          }
+        }catch(err){
+          failures.push(`${filename}: ${err.message}`);
+        }
+      }
+      updateToolbar();
+      if(failures.length) alert('Some files could not be deleted:\n' + failures.join('\n'));
+      // leave select mode after delete
+      selectMode = false;
+      selectToggle.textContent = 'Select';
+      for(const el of selected.values()) el.classList.remove('selected');
+      selected.clear();
+      updateToolbar();
+    });
+
+    enhanceExisting();
+    updateToolbar();
+
+    // scroll controls
+    const scrollPrev = document.getElementById('scrollPrev');
+    const scrollNext = document.getElementById('scrollNext');
+    const SCROLL_AMOUNT = 600;
+    if(scrollPrev && scrollNext){
+      scrollPrev.addEventListener('click', ()=> gallery.scrollBy({ left: -SCROLL_AMOUNT, behavior: 'smooth' }));
+      scrollNext.addEventListener('click', ()=> gallery.scrollBy({ left: SCROLL_AMOUNT, behavior: 'smooth' }));
+    }
+
+    // (wheel-to-horizontal scrolling removed)
+  })();
+</script>
 
 </body>
 </html>

@@ -48,15 +48,10 @@ button {
   backdrop-filter: blur(4px);
 }
 
-#showDrawBtn, #showGalleryBtn, #clearBtn, #saveBtn {
+#showDrawBtn, #showGalleryBtn, #clearBtn, #saveBtn, #backHomeBtn, #backHomeBtn2 {
   background: var(--primary);
   color: white;
   box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
-}
-
-#backHomeBtn, #backHomeBtn2 {
-  background: var(--glass);
-  color: #94a3b8;
 }
 
 button:hover {
